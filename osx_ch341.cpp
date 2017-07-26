@@ -35,6 +35,7 @@
 #include <IOKit/serial/IOSerialKeys.h>
 #include <IOKit/usb/IOUSBHostInterface.h>
 #include <IOKit/usb/IOUSBLog.h>
+#include <IOKit/usb/StandardUSB.h>
 #include <kern/clock.h>
 
 
@@ -134,8 +135,9 @@ bool osx_wch_driver_ch341::start(IOService *provider)
         goto Fail;
     }
 
-	
-    if (fpDevice->GetNumConfigurations() < 1)
+
+    if (fpDevice->getDeviceDescriptor()->bNumConfigurations < 1)
+//    if (fpDevice->GetNumConfigurations() < 1)
     {
         IOLog("%s(%p)::start - no composite configurations\n", getName(), this);
         goto Fail;
@@ -145,7 +147,8 @@ bool osx_wch_driver_ch341::start(IOService *provider)
     if( !createNub() ) goto Fail;
 	
     // Now configure it (leaves device suspended)
-    if( !configureDevice( fpDevice->GetNumConfigurations() ) ) goto Fail;
+    if( !configureDevice( fpDevice->getDeviceDescriptor()->bNumConfigurations ) ) goto Fail;
+//    if( !configureDevice( fpDevice->GetNumConfigurations() ) ) goto Fail;
 	
     // Finally create the bsd tty (serial stream) and leave it there until usb stop
 	
@@ -397,12 +400,14 @@ bool osx_wch_driver_ch341::allocateResources( void )
 		return false;
     }
 	
-    fpInterfaceNumber = fpInterface->GetInterfaceNumber();
+    fpInterfaceNumber = fpDevice->getConfigurationDescriptor()->bNumInterfaces;
+//    fpInterfaceNumber = fpInterface->GetInterfaceNumber();
     
     epReq.type          = kUSBBulk;
     epReq.direction     = kUSBIn;
     epReq.maxPacketSize = 0;
     epReq.interval      = 0;
+    
     fpInPipe = fpInterface->FindNextPipe( 0, &epReq );
 	if (!fpInPipe) {
 	    IOLog("%s(%p)::allocateResources failed - no fpInPipe.\n", getName(), this);
@@ -1067,16 +1072,16 @@ void osx_wch_driver_ch341::stopPipes()
 {
 	DEBUG_IOLog(4,"%s(%p)::Stopping\n", getName(), this);
     if (fpInterruptPipe){    
-		fpInterruptPipe->Abort();}
+		fpInterruptPipe->abort();}
     DEBUG_IOLog(5,"%s(%p)::stopPipes fpInterruptPipe succeed\n", getName(), this);
 	
     DEBUG_IOLog(5,"%s(%p)::stopPipes fpInPipe %p\n", getName(), this, fpInPipe);
-    if (fpInPipe){     
-	    fpInPipe->Abort();}
+    if (fpInPipe){
+	    fpInPipe->abort();}
 	DEBUG_IOLog(5,"%s(%p)::stopPipes fpOutPipe %p\n", getName(), this, fpOutPipe);
 	
     if (fpOutPipe){        		
-		fpOutPipe->Abort();}
+		fpOutPipe->abort();}
 	DEBUG_IOLog(5,"%s(%p)::stopPipes succeed\n", getName(), this);
   
 
@@ -1201,7 +1206,7 @@ IOReturn err = kIOReturnSuccess;
 			DEBUG_IOLog(3,"%s(%p)::message - kIOUSBMessagePortHasBeenReset\n", getName(), this);
 
 				
-			if (fpDevice->GetNumConfigurations() < 1)
+			if (fpDevice->getDeviceDescriptor()->bNumConfigurations < 1)
 				{
 				DEBUG_IOLog(3,"%s(%p)::message - no composite configurations\n", getName(), this);
 				err = kIOUSBConfigNotFound;
@@ -1209,7 +1214,7 @@ IOReturn err = kIOReturnSuccess;
 				}
 		
 			// Now configure it (leaves device suspended)
-			if( !configureDevice( fpDevice->GetNumConfigurations() ) ) 
+			if( !configureDevice( fpDevice->getDeviceDescriptor()->bNumConfigurations ) )
 				{
 				err = kIOUSBConfigNotFound;
 				goto Fail;
