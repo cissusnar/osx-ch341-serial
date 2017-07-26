@@ -32,7 +32,11 @@
 #include <IOKit/IOService.h>
 #include <IOKit/serial/IOSerialDriverSync.h>
 #include <IOKit/serial/IORS232SerialStreamSync.h>
-#include <IOKit/usb/IOUSBDevice.h>
+#include <IOKit/usb/USB.h>
+#include <IOKit/usb/IOUSBHostPipe.h>
+//#include <IOKit/usb/IOUSBHostHIDDevice.h>
+//#include <IOKit/usb/IOUSBHostDevice.h>
+#include <IOKit/IOBufferMemoryDescriptor.h>
 
 
 #if DEBUG
@@ -380,11 +384,11 @@ private:
     bool                initForPM(IOService *provider);
 	
 public:
-	IOUSBDevice         *fpDevice;
-    IOUSBInterface      *fpInterface;
-    IOUSBPipe           *fpInPipe;
-    IOUSBPipe           *fpOutPipe;
-    IOUSBPipe           *fpInterruptPipe;
+	IOUSBHostDevice         *fpDevice;
+    IOUSBHostInterface      *fpInterface;
+    IOUSBHostPipe           *fpInPipe;
+    IOUSBHostPipe           *fpOutPipe;
+    IOUSBHostPipe           *fpInterruptPipe;
 	// IOKit methods
 
 	virtual bool init(OSDictionary *dictionary = 0);

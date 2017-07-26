@@ -1322,7 +1322,7 @@ void osx_wch_driver_ch341::changeState( PortInfo_t *port, UInt32 state, UInt32 m
 
                 } else {
 					port->State &= ~PD_RS232_S_DTR;
-					setControlLines( port );	
+					setControlLines( port );
 
                 }
             }

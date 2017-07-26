@@ -32,7 +32,7 @@
 
 #include "osx_ch341.h"
 #include <IOKit/serial/IOSerialKeys.h>
-#include <IOKit/usb/IOUSBInterface.h>
+#include <IOKit/usb/IOUSBHostInterface.h>
 #include <IOKit/usb/IOUSBLog.h>
 #include <kern/clock.h>
 
