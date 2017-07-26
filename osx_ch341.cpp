@@ -34,6 +34,7 @@
 #include "osx_ch341.h"
 #include <IOKit/serial/IOSerialKeys.h>
 #include <IOKit/usb/IOUSBHostInterface.h>
+#include <IOKit/usb/IOUSBHostDevice.h>
 #include <IOKit/usb/IOUSBLog.h>
 #include <IOKit/usb/StandardUSB.h>
 #include <kern/clock.h>
@@ -608,7 +609,7 @@ IOReturn osx_wch_driver_ch341::CheckSerialState( void )
 bool osx_wch_driver_ch341::configureDevice( UInt8 numConfigs )
 {
     IOUSBFindInterfaceRequest           req;            // device request Class on stack
-    const IOUSBConfigurationDescriptor  *cd = NULL;     // configuration descriptor
+    const StandardUSB::ConfigurationDescriptor * cd = NULL;     // configuration descriptor
     IOUSBInterfaceDescriptor            *intf = NULL;   // interface descriptor
     IOReturn                            ior;
     UInt8                               cval;
@@ -618,7 +619,8 @@ bool osx_wch_driver_ch341::configureDevice( UInt8 numConfigs )
 	
     for (cval=0; cval<numConfigs; cval++)
     {
-		cd = fpDevice->GetFullConfigurationDescriptor(cval);
+        cd = fpDevice->getConfigurationDescriptor(cval);
+//		cd = fpDevice->GetFullConfigurationDescriptor(cval);
 		if ( !cd )
 		{
 			IOLog("%s(%p)::configureDevice - Error getting the full configuration descriptor\n", getName(), this);
@@ -632,28 +634,31 @@ bool osx_wch_driver_ch341::configureDevice( UInt8 numConfigs )
 			req.bInterfaceSubClass  = kIOUSBFindInterfaceDontCare;
 			req.bInterfaceProtocol  = kIOUSBFindInterfaceDontCare;
 			req.bAlternateSetting   = kIOUSBFindInterfaceDontCare;
-			
-			ior = fpDevice->FindNextInterfaceDescriptor(cd, intf, &req, &intf);
-			if ( ior == kIOReturnSuccess )
-			{
-				if ( intf ){
-					config = cd->bConfigurationValue;
-					DEBUG_IOLog(5,"%s(%p)::configureDevice - Interface descriptor found\n", getName(), this);
-					break;
-				} else {
-					DEBUG_IOLog(5,"%s(%p)::configureDevice - That's weird the interface was null\n", getName(), this);
-					cd = NULL;
-				}
-			} else {
-				IOLog("%s(%p)::configureDevice - No CDC interface found this configuration\n", getName(), this);
-				cd = NULL;
-			}
+            
+            InterfaceDescriptor* intDesc = NULL;
+            while((intDesc = (InterfaceDescriptor *)StandardUSB::getNextInterfaceDescriptor(cd, intDesc)) != NULL)
+            {
+                if(intDesc->bInterfaceClass == req.bInterfaceClass)
+                {
+                    break;
+                }
+            }
+            
+//			ior = fpDevice->FindNextInterfaceDescriptor(cd, intf, &req, &intf);
+            if (intDesc){
+                config = cd->bConfigurationValue;
+                DEBUG_IOLog(5,"%s(%p)::configureDevice - Interface descriptor found\n", getName(), this);
+                break;
+            } else {
+                DEBUG_IOLog(5,"%s(%p)::configureDevice - That's weird the interface was null\n", getName(), this);
+                cd = NULL;
+            }
 		}
     }
 
     if ( !cd )
     {
-		goto Fail;
+		return false;
     }
 	
 	// Now lets do it for real
@@ -663,7 +668,22 @@ bool osx_wch_driver_ch341::configureDevice( UInt8 numConfigs )
     req.bInterfaceProtocol  = kIOUSBFindInterfaceDontCare;
     req.bAlternateSetting   = kIOUSBFindInterfaceDontCare;
     
-    fpInterface = fpDevice->FindNextInterface( NULL, &req );
+    
+    OSIterator* iterator = fpDevice->getChildIterator(gIOServicePlane);
+    OSObject* candidate = NULL;
+    while(iterator != NULL && (candidate = iterator->getNextObject()) != NULL)
+    {
+        IOUSBHostInterface* interfaceCandidate = OSDynamicCast(IOUSBHostInterface, candidate);
+        if(   interfaceCandidate != NULL
+           && interfaceCandidate->getInterfaceDescriptor()->bInterfaceClass == req.bInterfaceClass)
+        {
+            fpInterface = interfaceCandidate;
+            break;
+        }
+    }
+    OSSafeReleaseNULL(iterator);
+    
+//    fpInterface = fpDevice->FindNextInterface( NULL, &req );
     if ( !fpInterface )
 	{
 		DEBUG_IOLog(4,"%s(%p)::configureDevice - Find next interface failed open device and reallocate objects\n", getName(), this);
@@ -672,13 +692,28 @@ bool osx_wch_driver_ch341::configureDevice( UInt8 numConfigs )
 			IOLog("%s(%p)::configureDevice - unable to open device for configuration \n", getName(), this);
 			goto Fail;
 			}
-		IOReturn rtn =  fpDevice->SetConfiguration(fpDevice, fpDevice->GetFullConfigurationDescriptor(0)->bConfigurationValue, true);
+
+       IOReturn rtn = fpDevice->setConfiguration(fpDevice->getConfigurationDescriptor()->bConfigurationValue);
+//		IOReturn rtn =  fpDevice->SetConfiguration(fpDevice, fpDevice->GetFullConfigurationDescriptor(0)->bConfigurationValue, true);
 		if (rtn)
 		{
 			IOLog("%s(%p)::configureDevice - unable to set the configuration\n", getName(), this);
 			goto Fail;
 		}
-		fpInterface = fpDevice->FindNextInterface( NULL, &req );
+        OSIterator* iterator = fpDevice->getChildIterator(gIOServicePlane);
+        OSObject* candidate = NULL;
+        while(iterator != NULL && (candidate = iterator->getNextObject()) != NULL)
+        {
+            IOUSBHostInterface* interfaceCandidate = OSDynamicCast(IOUSBHostInterface, candidate);
+            if(   interfaceCandidate != NULL
+               && interfaceCandidate->getInterfaceDescriptor()->bInterfaceClass == req.bInterfaceClass)
+            {
+                fpInterface = interfaceCandidate;
+                break;
+            }
+        }
+        OSSafeReleaseNULL(iterator);
+//		fpInterface = fpDevice->FindNextInterface( NULL, &req );
 		if ( !fpInterface )
 		{
 			IOLog("%s(%p)::configureDevice - Find interface failed\n", getName(), this);
@@ -790,13 +825,12 @@ bool osx_wch_driver_ch341::createSuffix( unsigned char *sufKey )
     bool                    keyOK = false;      
     DEBUG_IOLog(4,"%s(%p)::createSuffix\n", getName(), this);
 	
-    indx = fpDevice->GetSerialNumberStringIndex();  
+    indx = fpDevice->getDeviceDescriptor()->iSerialNumber;
 	DEBUG_IOLog(5,"%s(%p)::createSuffix the index of string descriptor describing the device's serial number: %d\n", getName(), this, indx );
 	
     if (indx != 0 )
     {   
-		// Generate suffix key based on the serial number string (if reasonable <= 8 and > 0)   
-		
+		// Generate suffix key based on the serial number string (if reasonable <= 8 and > 0)
 		rc = fpDevice->GetStringDescriptor(indx, (char *)&serBuf, sizeof(serBuf));
 		if ( !rc )
 		{
@@ -976,7 +1010,7 @@ bool osx_wch_driver_ch341::createSerialStream()
 		
 		// Save the Product String  (at least the first productNameLength's worth).
 		
-		indx = fpDevice->GetProductStringIndex();   
+        indx = fpDevice->getDeviceDescriptor()->iProduct;
 		if ( indx != 0 )
 		{   
 			rc = fpDevice->GetStringDescriptor( indx, (char *)&fProductName, sizeof(fProductName) );
@@ -1042,6 +1076,7 @@ bool osx_wch_driver_ch341::startPipes( void )
     if(!fpPipeOutMDP) goto Fail;
 
 	// Read the data-in bulk pipe
+
 	rtn = fpInPipe->Read(fpPipeInMDP, &fReadCompletionInfo, NULL );
 
     if( !(rtn == kIOReturnSuccess) ) goto Fail;

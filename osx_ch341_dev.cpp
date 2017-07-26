@@ -55,7 +55,8 @@ IOReturn osx_wch_driver_ch341::ch341_control_out(UInt8 req, UInt16 value, UInt16
     request.wLength = 0;
     request.pData = NULL;
     
-    rtn = fpDevice->DeviceRequest(&request);
+    
+//    rtn = fpDevice->DeviceRequest(&request);
     DEBUG_IOLog(5,"%s(%p)::ch341_control_out 0x%x:0x%x:0x%x  %d\n", getName(), this,req,value,index,rtn);
     return rtn;
 }
@@ -71,7 +72,7 @@ IOReturn osx_wch_driver_ch341::ch341_control_in(UInt8 req, UInt16 value, UInt16 
     request.wLength = len;
     request.pData = buf;
     
-    rtn = fpDevice->DeviceRequest(&request);
+//    rtn = fpDevice->DeviceRequest(&request);
     DEBUG_IOLog(5,"%s(%p)::ch341_control_in 0x%x:0x%x:0x%x  %d got:%d\n", getName(), this,req,value,index,rtn,request.wLenDone);
     if(lenDone)
         *lenDone = request.wLenDone;
