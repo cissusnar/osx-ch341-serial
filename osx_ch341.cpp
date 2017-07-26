@@ -33,7 +33,7 @@
 
 #include "osx_ch341.h"
 #include <IOKit/serial/IOSerialKeys.h>
-#include <IOKit/usb/IOUSBInterface.h>
+#include <IOKit/usb/IOUSBHostInterface.h>
 #include <IOKit/usb/IOUSBLog.h>
 #include <kern/clock.h>
 
@@ -82,9 +82,9 @@ void osx_wch_driver_ch341::free(void)
 
 IOService *osx_wch_driver_ch341::probe(IOService *provider, SInt32 *score)
 {
-	IOUSBDevice		*Provider;
+	IOUSBHostDevice		*Provider;
 	DEBUG_IOLog(4,"%s(%p)::Probe\n", getName(), this);
-	Provider = OSDynamicCast(IOUSBDevice, provider);   
+	Provider = OSDynamicCast(IOUSBHostDevice, provider);
 	 if (!Provider) {
         IOLog("%s(%p)::Probe Attached to non-IOUSBDevice provider!  Failing probe()\n", getName(), this);
         return NULL;
@@ -126,7 +126,7 @@ bool osx_wch_driver_ch341::start(IOService *provider)
         goto Fail;
     }	
 	
-    fpDevice = OSDynamicCast(IOUSBDevice, provider);
+    fpDevice = OSDynamicCast(IOUSBHostDevice, provider);
 	
     if(!fpDevice) 
     {
@@ -612,7 +612,7 @@ bool osx_wch_driver_ch341::configureDevice( UInt8 numConfigs )
     DEBUG_IOLog(4,"%s(%p)::configureDevice\n", getName(), this);
 	
     for (cval=0; cval<numConfigs; cval++)
-    {	
+    {
 		cd = fpDevice->GetFullConfigurationDescriptor(cval);
 		if ( !cd )
 		{

@@ -35,6 +35,7 @@
 #include <IOKit/usb/IOUSBHostInterface.h>
 #include <IOKit/usb/IOUSBLog.h>
 #include <kern/clock.h>
+#include <IOKit/usb/StandardUSB.h>
 
 
 extern "C" {
