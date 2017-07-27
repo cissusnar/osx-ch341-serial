@@ -390,7 +390,7 @@ bool osx_wch_driver_ch341::allocateResources( void )
     // Open all the end points
     if (!fpInterface) {
 	    IOLog("%s(%p)::allocateResources failed - no fpInterface.\n", getName(), this);
-		goto Fail;
+		return false;
 	}
 	
     goodCall = fpInterface->open( this );       // close done in releaseResources
@@ -409,22 +409,49 @@ bool osx_wch_driver_ch341::allocateResources( void )
     epReq.maxPacketSize = 0;
     epReq.interval      = 0;
     
-    fpInPipe = fpInterface->FindNextPipe( 0, &epReq );
+    
+    const EndpointDescriptor* endpointCandidate = NULL;
+
+    while((endpointCandidate = (EndpointDescriptor *)StandardUSB::getNextAssociatedDescriptorWithType(fpInterface->getConfigurationDescriptor(), fpInterface->getInterfaceDescriptor(), endpointCandidate, kDescriptorTypeEndpoint)) != NULL)
+    {
+        uint8_t direction = StandardUSB::getEndpointDirection(endpointCandidate);
+        uint8_t type = StandardUSB::getEndpointType(endpointCandidate);
+        
+        if (type == kUSBBulk)
+        {
+            if (direction == kUSBIn && !fpInPipe) {
+                fpInPipe = fpInterface->copyPipe(StandardUSB::getEndpointAddress(endpointCandidate));
+                continue;
+            }
+            if (direction == kUSBOut && !fpOutPipe) {
+                fpOutPipe = fpInterface->copyPipe(StandardUSB::getEndpointAddress(endpointCandidate));
+                continue;
+            }
+        }
+        if (type == kUSBInterrupt) {
+            if (direction == kUSBIn && !fpInterruptPipe) {
+                fpInterruptPipe = fpInterface->copyPipe(StandardUSB::getEndpointAddress(endpointCandidate));
+                continue;
+            }
+        }
+    }
+    
+//    fpInPipe = fpInterface->FindNextPipe( 0, &epReq );
 	if (!fpInPipe) {
 	    IOLog("%s(%p)::allocateResources failed - no fpInPipe.\n", getName(), this);
 		goto Fail;
 	}
 	
-    epReq.direction = kUSBOut;
-    fpOutPipe = fpInterface->FindNextPipe( 0, &epReq );
+//    epReq.direction = kUSBOut;
+//    fpOutPipe = fpInterface->FindNextPipe( 0, &epReq );
 	if (!fpOutPipe) {
 	    IOLog("%s(%p)::allocateResources failed - no fpOutPipe.\n", getName(), this);
 		goto Fail;
 	}
 	
-    epReq.type          = kUSBInterrupt;
-    epReq.direction     = kUSBIn;
-    fpInterruptPipe = fpInterface->FindNextPipe( 0, &epReq );
+//    epReq.type          = kUSBInterrupt;
+//    epReq.direction     = kUSBIn;
+//    fpInterruptPipe = fpInterface->FindNextPipe( 0, &epReq );
 	if (!fpInterruptPipe) {
 	    IOLog("%s(%p)::allocateResources failed - no fpInterruptPipe.\n", getName(), this);
 		goto Fail;
@@ -816,7 +843,7 @@ bool osx_wch_driver_ch341::createSuffix( unsigned char *sufKey )
 {
     
     IOReturn                rc;
-    UInt8                   serBuf[10];     // arbitrary size > 8
+    char                    serBuf[10] = { 0 };     // arbitrary size > 8
     OSNumber                *location;
     UInt32                  locVal;
     UInt8                   *rlocVal;
@@ -829,9 +856,17 @@ bool osx_wch_driver_ch341::createSuffix( unsigned char *sufKey )
 	DEBUG_IOLog(5,"%s(%p)::createSuffix the index of string descriptor describing the device's serial number: %d\n", getName(), this, indx );
 	
     if (indx != 0 )
-    {   
+    {
+        size_t stringLength = sizeof(serBuf);
+        const StringDescriptor* stringDescriptor = fpDevice->getStringDescriptor(indx);
+        if(   stringDescriptor != NULL
+           && stringDescriptor->bLength > StandardUSB::kDescriptorSize)
+        {
+            rc = StandardUSB::stringDescriptorToUTF8(stringDescriptor, serBuf, stringLength);
+        }
+        
 		// Generate suffix key based on the serial number string (if reasonable <= 8 and > 0)
-		rc = fpDevice->GetStringDescriptor(indx, (char *)&serBuf, sizeof(serBuf));
+//		rc = fpDevice->GetStringDescriptor(indx, (char *)&serBuf, sizeof(serBuf));
 		if ( !rc )
 		{
 			DEBUG_IOLog(5,"%s(%p)::createSuffix serial number: %s\n", getName(), this, serBuf );
@@ -1012,8 +1047,16 @@ bool osx_wch_driver_ch341::createSerialStream()
 		
         indx = fpDevice->getDeviceDescriptor()->iProduct;
 		if ( indx != 0 )
-		{   
-			rc = fpDevice->GetStringDescriptor( indx, (char *)&fProductName, sizeof(fProductName) );
+		{
+            size_t stringLength = sizeof(fProductName);
+            const StringDescriptor* stringDescriptor = fpDevice->getStringDescriptor(indx);
+            if(   stringDescriptor != NULL
+               && stringDescriptor->bLength > StandardUSB::kDescriptorSize)
+            {
+                rc = StandardUSB::stringDescriptorToUTF8(stringDescriptor, fProductName, stringLength);
+            }
+            
+//			rc = fpDevice->GetStringDescriptor( indx, (char *)&fProductName, sizeof(fProductName) );
 			if ( !rc )
 			{
 				DEBUG_IOLog(4,"%s(%p)::createSerialStream product name: %s\n", getName(), this, fProductName);

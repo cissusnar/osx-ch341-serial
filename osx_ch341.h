@@ -344,7 +344,7 @@ private:
     UInt8           fSessions;      // Active sessions (count of opens on /dev/tty entries)
     bool            fUSBStarted;        // usb family has started (stopped) us
     bool            fTerminate;     // Are we being terminated (ie the device was unplugged)
-    UInt8           fProductName[productNameLength];    // Actually the product String from the Device
+    char           fProductName[productNameLength] = {0};    // Actually the product String from the Device
     PortInfo_t      *fPort;         // The Port
     bool            fReadActive;    // usb read is active
 #if FIX_PARITY_PROCESSING
