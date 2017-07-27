@@ -35,7 +35,6 @@
 #include <IOKit/serial/IOSerialKeys.h>
 #include <IOKit/usb/IOUSBHostInterface.h>
 #include <IOKit/usb/IOUSBHostDevice.h>
-#include <IOKit/usb/IOUSBLog.h>
 #include <IOKit/usb/StandardUSB.h>
 #include <kern/clock.h>
 
@@ -492,15 +491,15 @@ bool osx_wch_driver_ch341::allocateResources( void )
 	    IOLog("%s(%p)::allocateResources failed - no fPort.\n", getName(), this);
 		goto Fail;
 	}      
-    finterruptCompletionInfo.target = this;
+    finterruptCompletionInfo.owner = this;
     finterruptCompletionInfo.action = interruptReadComplete;
     finterruptCompletionInfo.parameter  = fPort;
     
-    fReadCompletionInfo.target  = this;
+    fReadCompletionInfo.owner  = this;
     fReadCompletionInfo.action  = dataReadComplete;
     fReadCompletionInfo.parameter   = fPort;
 	
-    fWriteCompletionInfo.target = this;
+    fWriteCompletionInfo.owner = this;
     fWriteCompletionInfo.action = dataWriteComplete;
     fWriteCompletionInfo.parameter  = fPort;
 	
@@ -1120,7 +1119,8 @@ bool osx_wch_driver_ch341::startPipes( void )
 
 	// Read the data-in bulk pipe
 
-	rtn = fpInPipe->Read(fpPipeInMDP, &fReadCompletionInfo, NULL );
+    rtn = fpInPipe->io(fpPipeInMDP, 0, &fReadCompletionInfo);
+//	rtn = fpInPipe->Read(fpPipeInMDP, &fReadCompletionInfo, NULL );
 
     if( !(rtn == kIOReturnSuccess) ) goto Fail;
 
@@ -1128,7 +1128,9 @@ bool osx_wch_driver_ch341::startPipes( void )
     if(!fPort) goto Fail;
 
 	if(!fpinterruptPipeMDP) goto Fail;
-	rtn = fpInterruptPipe->Read(fpinterruptPipeMDP, &finterruptCompletionInfo, NULL );
+    
+    rtn = fpInterruptPipe->io(fpinterruptPipeMDP, 0, &finterruptCompletionInfo);
+//	rtn = fpInterruptPipe->Read(fpinterruptPipeMDP, &finterruptCompletionInfo, NULL );
     if( !(rtn == kIOReturnSuccess) ) goto Fail;
 	
  
@@ -2991,7 +2993,8 @@ IOReturn osx_wch_driver_ch341::startTransmit(UInt32 control_length, UInt8 *contr
 	}
 
 #endif	
-    ior = fpOutPipe->Write( fpPipeOutMDP, 1000, 1000, &fWriteCompletionInfo );  // 1 second timeouts
+    fpOutPipe->io(fpPipeOutMDP, 1000, &fWriteCompletionInfo);
+//    ior = fpOutPipe->Write( fpPipeOutMDP, 1000, 1000, &fWriteCompletionInfo );  // 1 second timeouts
     DEBUG_IOLog(5,"%s(%p)::StartTransmit return value %d\n", getName(), this, ior);
     return ior;
     
@@ -3127,8 +3130,8 @@ void osx_wch_driver_ch341::interruptReadComplete( void *obj, void *param, IORetu
 		}
 		
 	    /* Queue the next interrupt read:   */
-		
-		me->fpInterruptPipe->Read( me->fpinterruptPipeMDP, &me->finterruptCompletionInfo, NULL );
+        me->fpInterruptPipe->io(me->fpinterruptPipeMDP, 0, &me->finterruptCompletionInfo);
+//		me->fpInterruptPipe->Read( me->fpinterruptPipeMDP, &me->finterruptCompletionInfo, NULL );
 
 #if FIX_PARITY_PROCESSING
         me->checkQueues( port );
@@ -3197,8 +3200,9 @@ void osx_wch_driver_ch341::dataReadComplete( void *obj, void *param, IOReturn rc
 			ior = me->addtoQueue( &me->fPort->RX, &me->fPipeInBuffer[0], dtlength );
 		}
 		
-		/* Queue the next read 	*/		
-		ior = me->fpInPipe->Read( me->fpPipeInMDP, &me->fReadCompletionInfo, NULL );
+		/* Queue the next read 	*/
+        ior = me->fpInPipe->io(me->fpPipeInMDP, 0, &me->fReadCompletionInfo);
+//		ior = me->fpInPipe->Read( me->fpPipeInMDP, &me->fReadCompletionInfo, NULL );
 	    
 		if ( ior == kIOReturnSuccess )
 		{

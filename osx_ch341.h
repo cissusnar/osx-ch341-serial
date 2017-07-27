@@ -373,9 +373,9 @@ private:
     
     UInt8               fpInterfaceNumber;
     
-    IOUSBCompletion     finterruptCompletionInfo;
-    IOUSBCompletion     fReadCompletionInfo;
-    IOUSBCompletion     fWriteCompletionInfo;
+    IOUSBHostCompletion     finterruptCompletionInfo;
+    IOUSBHostCompletion     fReadCompletionInfo;
+    IOUSBHostCompletion     fWriteCompletionInfo;
     
     static void         interruptReadComplete(  void *obj, void *param, IOReturn ior, UInt32 remaining );
     static void         dataReadComplete(  void *obj, void *param, IOReturn ior, UInt32 remaining );
