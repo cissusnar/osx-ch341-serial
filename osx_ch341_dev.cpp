@@ -33,6 +33,7 @@
 #include "osx_ch341.h"
 #include <IOKit/serial/IOSerialKeys.h>
 #include <IOKit/usb/IOUSBHostInterface.h>
+#include <IOKit/usb/IOUSBHostDevice.h>
 #include <IOKit/usb/IOUSBLog.h>
 #include <kern/clock.h>
 #include <IOKit/usb/StandardUSB.h>
@@ -47,13 +48,20 @@ extern "C" {
 IOReturn osx_wch_driver_ch341::ch341_control_out(UInt8 req, UInt16 value, UInt16 index)
 {
     IOReturn rtn;
-    IOUSBDevRequest request;
+    StandardUSB::DeviceRequest request;
     request.bmRequestType = VENDOR_WRITE_REQUEST_TYPE;
     request.bRequest = req;
     request.wValue =  value;
     request.wIndex = index;
     request.wLength = 0;
-    request.pData = NULL;
+    
+    IOService * client = fpDevice->getClient();
+    IOUSBHostDevice * device = fpDevice;
+    
+    uint16_t stat       = 0;
+
+    uint32_t bytesTransferred = 0;
+    rtn = device->deviceRequest(client, request, &stat, bytesTransferred, kUSBHostStandardRequestCompletionTimeout);
     
 //    rtn = fpDevice->DeviceRequest(&request);
     DEBUG_IOLog(5,"%s(%p)::ch341_control_out 0x%x:0x%x:0x%x  %d\n", getName(), this,req,value,index,rtn);
@@ -63,18 +71,24 @@ IOReturn osx_wch_driver_ch341::ch341_control_out(UInt8 req, UInt16 value, UInt16
 IOReturn osx_wch_driver_ch341::ch341_control_in(UInt8 req, UInt16 value, UInt16 index, void *buf, UInt16 len, UInt32 *lenDone)
 {
     IOReturn rtn;
-    IOUSBDevRequest request;
+    StandardUSB::DeviceRequest request;
     request.bmRequestType = VENDOR_READ_REQUEST_TYPE;
     request.bRequest = req;
     request.wValue =  value;
     request.wIndex = index;
     request.wLength = len;
-    request.pData = buf;
     
+    IOService * client = fpDevice->getClient();
+    IOUSBHostDevice * device = fpDevice;
+    
+    uint16_t stat       = 0;
+    
+    uint32_t bytesTransferred = 0;
+    rtn = device->deviceRequest(client, request, &stat, bytesTransferred, kUSBHostStandardRequestCompletionTimeout);
 //    rtn = fpDevice->DeviceRequest(&request);
-    DEBUG_IOLog(5,"%s(%p)::ch341_control_in 0x%x:0x%x:0x%x  %d got:%d\n", getName(), this,req,value,index,rtn,request.wLenDone);
+    DEBUG_IOLog(5,"%s(%p)::ch341_control_in 0x%x:0x%x:0x%x  %d got:%d\n", getName(), this,req,value,index,rtn,bytesTransferred);
     if(lenDone)
-        *lenDone = request.wLenDone;
+        *lenDone = bytesTransferred;
     return rtn;
 }
 
